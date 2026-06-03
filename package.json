@@ -1,0 +1,31 @@
+{
+  "name": "ott-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OTT streaming platform — MERN stack",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server",
+    "docker:up": "docker compose -f infra/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker-compose.yml down",
+    "seed": "npm run seed --prefix server",
+    "dev:setup": "npm run docker:up",
+    "worker": "node workers/transcode/index.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.34.5",
+    "dotenv": "^16.4.7",
+    "ffmpeg-static": "^5.2.0",
+    "ioredis": "^5.4.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
