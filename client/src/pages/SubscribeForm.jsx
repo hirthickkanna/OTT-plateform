@@ -42,6 +42,20 @@ export default function SubscribeForm() {
 
   const set = (field, val) => setForm((p) => ({ ...p, [field]: val }));
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -51,15 +65,70 @@ export default function SubscribeForm() {
         method: "POST",
         body: JSON.stringify({ planId: plan._id, ...form }),
       });
-      if (res.url) {
+
+      if (res.razorpayOrderId) {
+        const loaded = await loadRazorpayScript();
+        if (!loaded) {
+          setError("Razorpay SDK failed to load. Are you offline?");
+          setSubmitting(false);
+          return;
+        }
+
+        const options = {
+          key: res.keyId,
+          amount: res.amount,
+          currency: res.currency,
+          name: "StreamVault",
+          description: `Subscription - ${plan.name}`,
+          order_id: res.razorpayOrderId,
+          prefill: {
+            name: form.fullName,
+            contact: form.phone,
+            email: user?.email,
+          },
+          handler: async function (response) {
+            setSubmitting(true);
+            try {
+              const verifyRes = await api("/api/subscriptions/razorpay-verify", {
+                method: "POST",
+                body: JSON.stringify({
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  subscriptionId: res.subscriptionId,
+                }),
+              });
+              if (verifyRes.success) {
+                navigate("/account?subscribed=1");
+              } else {
+                setError("Payment verification failed.");
+              }
+            } catch (err) {
+              setError(err.message || "Verification failed");
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          theme: {
+            color: "#E11D48",
+          },
+          modal: {
+            ondismiss: function () {
+              setSubmitting(false);
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else if (res.url) {
         window.location.href = res.url;
       } else {
-        // Dev mode — no Stripe, plan activated directly
+        // Dev mode — no Stripe or Razorpay, plan activated directly
         navigate("/account?subscribed=1");
       }
     } catch (e) {
       setError(e.message);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -249,7 +318,7 @@ export default function SubscribeForm() {
                 <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <span>Secure payment via Stripe</span>
+                <span>Secure payment checkout</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">

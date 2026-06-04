@@ -6,6 +6,8 @@ const paymentSchema = new mongoose.Schema(
     amountCents: { type: Number, required: true },
     currency: { type: String, default: "usd" },
     stripePaymentId: String,
+    razorpayPaymentId: String,
+    razorpayOrderId: String,
     status: { type: String, required: true },
   },
   { timestamps: true },

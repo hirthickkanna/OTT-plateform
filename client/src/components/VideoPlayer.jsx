@@ -26,7 +26,16 @@ export default function VideoPlayer({ src, onProgress }) {
       // ── HLS playlist (transcoded / CDN stream) ────────────────────────────
       if (Hls.isSupported()) {
         console.log("[VideoPlayer] Initializing Hls.js for source:", normalizedSrc);
-        hls = new Hls();
+        hls = new Hls({
+          xhrSetup: function (xhr, url) {
+            if (url.includes("/api/streaming/key/")) {
+              const token = localStorage.getItem("token");
+              if (token) {
+                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+              }
+            }
+          }
+        });
         hls.loadSource(normalizedSrc);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {

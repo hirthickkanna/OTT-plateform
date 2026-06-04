@@ -36,27 +36,29 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     let idToken;
-    const isMockEmail = email.endsWith(".local");
+    const cleanEmail = email.trim().toLowerCase();
+    const isMockEmail = cleanEmail.endsWith(".local");
     if (auth && !isMockEmail) {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
       idToken = await userCredential.user.getIdToken();
     } else {
       console.warn("Using dev mock login token");
-      idToken = `dev-mock-token-${email}`;
+      idToken = `dev-mock-token-${cleanEmail}`;
     }
     return exchangeToken(idToken);
   };
 
   const register = async (email, password, displayName) => {
     let idToken;
-    const isMockEmail = email.endsWith(".local");
+    const cleanEmail = email.trim().toLowerCase();
+    const isMockEmail = cleanEmail.endsWith(".local");
     if (auth && !isMockEmail) {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       await updateProfile(userCredential.user, { displayName });
       idToken = await userCredential.user.getIdToken();
     } else {
       console.warn("Using dev mock registration token");
-      idToken = `dev-mock-token-${email}`;
+      idToken = `dev-mock-token-${cleanEmail}`;
     }
     return exchangeToken(idToken);
   };

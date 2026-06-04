@@ -18,6 +18,7 @@ import streamingRoutes from "./routes/streaming.routes.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import videoRoutes from "./routes/video.routes.js";
+import { startMediaServer } from "./services/mediaServer.js";
 
 import { fileURLToPath } from "url";
 
@@ -58,6 +59,7 @@ app.use(errorHandler);
 
 await connectDB();
 await ensureDevSeed();
+startMediaServer();
 
 const server = app.listen(PORT, "0.0.0.0", () => console.log(`API http://127.0.0.1:${PORT}`));
 server.on("error", (err) => {

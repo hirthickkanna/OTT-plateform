@@ -7,6 +7,7 @@ const liveChannelSchema = new mongoose.Schema(
     title: { type: String, required: true },
     streamKey: { type: String, unique: true, default: () => crypto.randomBytes(16).toString("hex") },
     hlsUrl: String,
+    youtubeStreamKey: { type: String, default: "" },
     isActive: { type: Boolean, default: false },
     startedAt: Date,
   },

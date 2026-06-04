@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const GENRES = ["Action","Comedy","Drama","Horror","Sci-Fi","Thriller","Romance","Documentary","Animation","Fantasy","Mystery","Adventure","Biography","Crime","History","Music","Sport","Western"];
-const RATINGS = ["G","PG","PG-13","R","NC-17","TV-MA","TV-14","TV-PG","TV-G","TV-Y"];
+const RATINGS = ["U", "UA 7+", "UA 13+", "UA 16+", "A"];
 
 const STATUS_STYLE = {
   ready:       "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",

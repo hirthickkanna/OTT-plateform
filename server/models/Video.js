@@ -17,6 +17,8 @@ const videoSchema = new mongoose.Schema(
     durationSec: Number,
     hlsUrl: String,
     thumbnailUrl: String,
+    hlsEncrypted: { type: Boolean, default: false },
+    aesKey: String,
     drmEnabled: { type: Boolean, default: false },
     isLive: { type: Boolean, default: false },
     isApproved: { type: Boolean, default: false },

@@ -48,6 +48,10 @@ router.post(
         creatorId: req.user.id,
         title: req.body.title,
         description: req.body.description,
+        genre: req.body.genre,
+        year: req.body.year,
+        rating: req.body.rating,
+        languages: req.body.languages || [],
         drmEnabled: req.body.drmEnabled ?? false,
       });
       res.status(201).json(video);

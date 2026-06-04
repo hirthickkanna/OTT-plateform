@@ -66,7 +66,7 @@ export default function Subscribe() {
             <span className="text-rose-400">✓</span> Watch on mobile &amp; TV
           </li>
           <li className="flex items-center gap-2">
-            <span className="text-rose-400">✓</span> Secure Stripe checkout
+            <span className="text-rose-400">✓</span> Secure online checkout
           </li>
           <li className="flex items-center gap-2">
             <span className="text-rose-400">✓</span> Live channels on Premium

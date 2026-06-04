@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { Plan } from "../models/Plan.js";
 import { User } from "../models/User.js";
 import { Video } from "../models/Video.js";
+import { UserSubscription } from "../models/UserSubscription.js";
 
 const plans = [
   {
@@ -138,6 +139,35 @@ export async function ensureDevSeed() {
       role: "admin",
     });
     console.log("Dev seed: admin user admin@streamvault.local / admin12345");
+  }
+
+  // Ensure both demo creator and admin have active subscriptions
+  const premiumPlan = await Plan.findOne({ slug: "premium" });
+  if (premiumPlan) {
+    await UserSubscription.findOneAndUpdate(
+      { userId: creator._id },
+      {
+        userId: creator._id,
+        planId: premiumPlan._id,
+        status: "active",
+        fullName: "Demo Creator",
+        phone: "+91 99999 99999",
+      },
+      { upsert: true },
+    );
+
+    await UserSubscription.findOneAndUpdate(
+      { userId: admin._id },
+      {
+        userId: admin._id,
+        planId: premiumPlan._id,
+        status: "active",
+        fullName: "Demo Admin",
+        phone: "+91 99999 88888",
+      },
+      { upsert: true },
+    );
+    console.log("Dev seed: active Premium plans seeded for demo and admin users");
   }
 
   const videoCount = await Video.countDocuments({ status: "ready", isLive: false });

@@ -10,6 +10,7 @@ const userSubscriptionSchema = new mongoose.Schema(
       default: "active",
     },
     stripeSubscriptionId: String,
+    razorpayOrderId: String,
     currentPeriodEnd: Date,
     fullName: { type: String, default: "" },
     phone: { type: String, default: "" },

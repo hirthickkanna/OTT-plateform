@@ -1,16 +1,26 @@
 import { Router } from "express";
 import Stripe from "stripe";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 import { requireAuth } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Plan } from "../models/Plan.js";
 import { UserSubscription } from "../models/UserSubscription.js";
+import { Payment } from "../models/Payment.js";
 
 const router = Router();
 
 function stripe() {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
+  if (!key || key.includes("placeholder")) return null;
   return new Stripe(key);
+}
+
+function razorpay() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret || keyId.includes("placeholder")) return null;
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
 // GET /api/subscriptions/plans — public
@@ -61,6 +71,41 @@ router.post("/register", requireAuth, async (req, res, next) => {
       });
     }
 
+    // Try to create Razorpay Order first if configured
+    const rzp = razorpay();
+    if (rzp) {
+      try {
+        const order = await rzp.orders.create({
+          amount: plan.priceCents, // Razorpay expects amount in paise (cents equivalent)
+          currency: plan.currency ? plan.currency.toUpperCase() : "INR",
+          receipt: sub._id.toString(),
+          notes: {
+            userId: req.user.id,
+            planId: plan._id.toString(),
+            subscriptionRecordId: sub._id.toString(),
+          },
+        });
+
+        // Store the order ID on the subscription
+        sub.razorpayOrderId = order.id;
+        await sub.save();
+
+        return res.json({
+          razorpayOrderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          keyId: process.env.RAZORPAY_KEY_ID,
+          subscriptionId: sub._id.toString(),
+        });
+      } catch (rzpError) {
+        console.error("Razorpay Order Creation failed:", rzpError.message);
+        if (process.env.NODE_ENV === "production" && !stripe()) {
+          throw rzpError;
+        }
+        console.log("Falling back to Stripe or direct activation");
+      }
+    }
+
     // Try to create Stripe checkout session
     const s = stripe();
     if (s && plan.stripePriceId && !plan.stripePriceId.includes("placeholder")) {
@@ -91,6 +136,58 @@ router.post("/register", requireAuth, async (req, res, next) => {
   }
 });
 
+// POST /api/subscriptions/razorpay-verify — verify signature and activate subscription
+router.post("/razorpay-verify", requireAuth, async (req, res, next) => {
+  try {
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, subscriptionId } = req.body;
+
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !subscriptionId) {
+      throw new AppError("Missing signature verification parameters", 400);
+    }
+
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      throw new AppError("Razorpay is not configured", 503);
+    }
+
+    // Verify signature
+    const text = razorpay_order_id + "|" + razorpay_payment_id;
+    const generated_signature = crypto
+      .createHmac("sha256", keySecret)
+      .update(text)
+      .digest("hex");
+
+    if (generated_signature !== razorpay_signature) {
+      throw new AppError("Invalid payment signature", 400);
+    }
+
+    // Update pending subscription to active
+    const sub = await UserSubscription.findById(subscriptionId);
+    if (!sub) {
+      throw new AppError("Subscription not found", 404);
+    }
+
+    sub.status = "active";
+    await sub.save();
+
+    const plan = await Plan.findById(sub.planId);
+
+    // Record the payment
+    await Payment.create({
+      userId: req.user.id,
+      amountCents: plan ? plan.priceCents : 0,
+      currency: plan?.currency || "inr",
+      razorpayPaymentId: razorpay_payment_id,
+      razorpayOrderId: razorpay_order_id,
+      status: "succeeded",
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // POST /api/subscriptions/checkout — legacy direct checkout (kept for backward compat)
 router.post("/checkout", requireAuth, async (req, res, next) => {
   try {
@@ -113,5 +210,6 @@ router.post("/checkout", requireAuth, async (req, res, next) => {
     next(e);
   }
 });
+
 
 export default router;

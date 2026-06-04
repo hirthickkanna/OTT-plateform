@@ -7,8 +7,10 @@ import VideoPlayer from "../components/VideoPlayer";
 export default function Live() {
   const [channels, setChannels] = useState([]);
   const [title, setTitle] = useState("");
+  const [youtubeStreamKey, setYoutubeStreamKey] = useState("");
   const [activeChannel, setActiveChannel] = useState(null);
-  const { isAuthenticated } = useAuth();
+  const [createdChannel, setCreatedChannel] = useState(null);
+  const { isAuthenticated, user } = useAuth();
 
   const load = () => api("/api/live").then(setChannels).catch(console.error);
 
@@ -22,9 +24,34 @@ export default function Live() {
       window.location.href = "/login";
       return;
     }
-    await api("/api/live", { method: "POST", body: JSON.stringify({ title }) });
-    setTitle("");
-    load();
+    try {
+      const channel = await api("/api/live", {
+        method: "POST",
+        body: JSON.stringify({ title, youtubeStreamKey }),
+      });
+      setCreatedChannel(channel);
+      setTitle("");
+      setYoutubeStreamKey("");
+      load();
+    } catch (err) {
+      console.error("Error creating channel:", err);
+    }
+  };
+
+  const deleteChannel = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this live channel?")) return;
+    try {
+      await api(`/api/live/${id}`, { method: "DELETE" });
+      if (activeChannel && activeChannel._id === id) {
+        setActiveChannel(null);
+      }
+      if (createdChannel && createdChannel._id === id) {
+        setCreatedChannel(null);
+      }
+      load();
+    } catch (err) {
+      console.error("Error deleting channel:", err);
+    }
   };
 
   return (
@@ -33,20 +60,103 @@ export default function Live() {
       <p className="mt-2 text-zinc-500">Watch and create live channels in real time.</p>
 
       {isAuthenticated && (
-        <form onSubmit={createChannel} className="mt-8 flex gap-3">
-          <input
-            placeholder="Channel title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 rounded-lg border border-white/10 bg-zinc-900/60 px-4 py-3 text-white outline-none focus:border-rose-500/50"
-          />
+        <form onSubmit={createChannel} className="mt-8 rounded-2xl border border-white/5 bg-zinc-900/20 p-6 space-y-4 shadow-xl">
+          <h2 className="text-lg font-semibold text-white">Start a New Channel</h2>
+          
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">Channel Title</label>
+            <input
+              placeholder="e.g. My Live Event"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-white outline-none focus:border-rose-500/50"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">YouTube Stream Key (Optional)</label>
+            <input
+              placeholder="Paste YouTube Stream Key for Multistreaming"
+              value={youtubeStreamKey}
+              onChange={(e) => setYoutubeStreamKey(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-white outline-none focus:border-rose-500/50 font-mono text-sm"
+            />
+            <p className="mt-1 text-xs text-zinc-500 font-normal">
+              Leave empty if you only want to stream directly on our platform.
+            </p>
+          </div>
+
           <button
             type="submit"
-            className="rounded-lg bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500"
+            className="w-full rounded-lg bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 cursor-pointer"
           >
             Create channel
           </button>
         </form>
+      )}
+
+      {createdChannel && (
+        <div className="mt-8 rounded-2xl border border-rose-500/20 bg-rose-950/20 p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-rose-500/20 pb-3">
+            <h3 className="text-lg font-semibold text-rose-400">Stream Setup Credentials</h3>
+            <button
+              onClick={() => setCreatedChannel(null)}
+              className="text-zinc-400 hover:text-white transition cursor-pointer text-sm font-semibold"
+            >
+              Dismiss
+            </button>
+          </div>
+          
+          <p className="mt-3 text-sm text-zinc-300 font-normal">
+            Use the settings below in your broadcasting software (like OBS Studio) to start your live stream:
+          </p>
+          
+          <div className="mt-4 space-y-4">
+            <div>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">Server URL (RTMP Ingestion)</span>
+              <div className="mt-1 flex items-center justify-between rounded-lg bg-black/40 px-3 py-2 border border-white/5 font-mono text-sm">
+                <span className="truncate mr-2 select-all text-zinc-300">{createdChannel.ingestUrl}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdChannel.ingestUrl);
+                    alert("RTMP server URL copied to clipboard!");
+                  }}
+                  className="rounded bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 px-2 py-1 text-xs transition cursor-pointer"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">Stream Key</span>
+              <div className="mt-1 flex items-center justify-between rounded-lg bg-black/40 px-3 py-2 border border-white/5 font-mono text-sm">
+                <span className="truncate mr-2 select-all text-zinc-300">{createdChannel.streamKey}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdChannel.streamKey);
+                    alert("Stream key copied to clipboard!");
+                  }}
+                  className="rounded bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 px-2 py-1 text-xs transition cursor-pointer"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            {createdChannel.youtubeStreamKey && (
+              <div>
+                <span className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">YouTube Multistreaming</span>
+                <div className="mt-1 flex items-center justify-between rounded-lg bg-rose-950/40 px-3 py-2 border border-rose-500/20 text-rose-300 text-sm">
+                  <span>Enabled (Relaying to: {createdChannel.youtubeStreamKey.slice(0, 4)}••••{createdChannel.youtubeStreamKey.slice(-4)})</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activeChannel && (
@@ -77,14 +187,24 @@ export default function Live() {
           channels.map((c) => (
             <li key={c._id} className="flex items-center justify-between px-6 py-4">
               <strong className="text-white">{c.title}</strong>
-              {c.hlsUrl && (
-                <button
-                  onClick={() => setActiveChannel(c)}
-                  className="text-sm font-medium text-rose-400 transition hover:text-rose-300 cursor-pointer"
-                >
-                  Watch Live →
-                </button>
-              )}
+              <div className="flex items-center gap-4">
+                {c.hlsUrl && (
+                  <button
+                    onClick={() => setActiveChannel(c)}
+                    className="text-sm font-medium text-rose-400 transition hover:text-rose-300 cursor-pointer animate-pulse"
+                  >
+                    Watch Live →
+                  </button>
+                )}
+                {isAuthenticated && (c.creatorId === user?.id || c.creatorId === user?._id) && (
+                  <button
+                    onClick={() => deleteChannel(c._id)}
+                    className="text-xs font-semibold text-zinc-500 hover:text-rose-500 transition cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </li>
           ))
         )}
