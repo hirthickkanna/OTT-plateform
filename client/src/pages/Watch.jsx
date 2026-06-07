@@ -17,9 +17,11 @@ export default function Watch() {
   const { id } = useParams();
   const [video, setVideo] = useState(null);
   const [playback, setPlayback] = useState(null);
+  const [playbackError, setPlaybackError] = useState("");
   const [similar, setSimilar] = useState([]);
   const {
     isAuthenticated,
+    subscription,
     isOffline,
     isDownloaded,
     isDownloading,
@@ -38,10 +40,17 @@ export default function Watch() {
   useEffect(() => {
     setVideo(null);
     setSimilar([]);
+    setPlaybackError("");
     api(`/api/videos/${id}`).then(setVideo).catch(console.error);
     api(`/api/streaming/playback/${id}`)
-      .then(setPlayback)
-      .catch((e) => console.warn(e.message));
+      .then((data) => {
+        setPlayback(data);
+        setPlaybackError("");
+      })
+      .catch((e) => {
+        console.warn(e.message);
+        setPlaybackError(e.message || "Failed to load playback.");
+      });
     api(`/api/recommendations/similar/${id}`)
       .then(setSimilar)
       .catch(console.error);
@@ -105,6 +114,25 @@ export default function Watch() {
             </div>
           ) : playback?.hlsUrl ? (
             <VideoPlayer src={playback.hlsUrl} onProgress={onProgress} />
+          ) : playbackError ? (
+            <div className="flex aspect-video flex-col items-center justify-center bg-zinc-900 border border-white/5 p-6 text-center text-zinc-400 gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-md">
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="max-w-md">
+                <h3 className="text-lg font-bold text-white">Active Subscription Required</h3>
+                <p className="mt-2 text-sm text-zinc-500">
+                  {playbackError.includes("subscription") 
+                    ? "An active subscription plan is required to watch this video." 
+                    : playbackError}
+                </p>
+                <Link to="/subscribe" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-rose-500">
+                  View Subscription Plans
+                </Link>
+              </div>
+            </div>
           ) : (
             <div className="flex aspect-video items-center justify-center bg-zinc-900 text-zinc-500">
               Playback unavailable — video may still be processing.
@@ -123,6 +151,10 @@ export default function Watch() {
                   onClick={() => {
                     if (!isAuthenticated) {
                       navigate("/login?reason=download");
+                      return;
+                    }
+                    if (!subscription) {
+                      navigate("/subscribe");
                       return;
                     }
                     if (downloaded) {

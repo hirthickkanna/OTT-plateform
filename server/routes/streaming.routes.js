@@ -43,16 +43,16 @@ router.post("/transcode", requireAuth, async (req, res, next) => {
   }
 });
 
-router.get("/playback/:videoId", optionalAuth, async (req, res, next) => {
+router.get("/playback/:videoId", requireAuth, async (req, res, next) => {
   try {
     const video = await Video.findById(req.params.videoId);
     if (!video || video.status !== "ready" || !video.hlsUrl) {
       throw new AppError("Video not available", 403);
     }
 
-    if (video.drmEnabled && req.user?.id) {
-      const sub = await UserSubscription.getActiveForUser(req.user.id);
-      if (!sub) throw new AppError("Active subscription required", 403);
+    const sub = await UserSubscription.getActiveForUser(req.user.id);
+    if (!sub) {
+      throw new AppError("Active subscription required to play videos", 403);
     }
 
     await Video.updateOne({ _id: video._id }, { $inc: { viewCount: 1 } });

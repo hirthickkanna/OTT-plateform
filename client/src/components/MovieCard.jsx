@@ -24,6 +24,7 @@ function Poster({ title, thumbnailUrl }) {
 export default function MovieCard({ video, recommendation }) {
   const {
     isAuthenticated,
+    subscription,
     isOffline,
     isDownloaded,
     isDownloading,
@@ -108,6 +109,10 @@ export default function MovieCard({ video, recommendation }) {
                   e.stopPropagation();
                   if (!isAuthenticated) {
                     navigate("/login?reason=download");
+                    return;
+                  }
+                  if (!subscription) {
+                    navigate("/subscribe");
                     return;
                   }
                   if (downloaded) {
