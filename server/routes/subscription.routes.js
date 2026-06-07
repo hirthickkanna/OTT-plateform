@@ -35,7 +35,7 @@ router.get("/plans", async (_req, res, next) => {
 // GET /api/subscriptions/me — current user's active subscription
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
-    const sub = await UserSubscription.findOne({ userId: req.user.id, status: "active" }).populate("planId");
+    const sub = await UserSubscription.getActiveForUser(req.user.id);
     res.json(sub);
   } catch (e) {
     next(e);
@@ -98,11 +98,11 @@ router.post("/register", requireAuth, async (req, res, next) => {
           subscriptionId: sub._id.toString(),
         });
       } catch (rzpError) {
-        console.error("Razorpay Order Creation failed:", rzpError.message);
-        if (process.env.NODE_ENV === "production" && !stripe()) {
-          throw rzpError;
-        }
-        console.log("Falling back to Stripe or direct activation");
+        const errMsg = rzpError.error?.description || rzpError.description || rzpError.message || "Unknown Razorpay error";
+        console.error("Razorpay Order Creation failed:", rzpError);
+        // Map 401 (Razorpay API auth failure) to 500 so frontend won't log the user out
+        const statusCode = rzpError.statusCode === 401 ? 500 : (rzpError.statusCode || 500);
+        throw new AppError(`Razorpay Error: ${errMsg}`, statusCode);
       }
     }
 
@@ -129,6 +129,7 @@ router.post("/register", requireAuth, async (req, res, next) => {
 
     // No Stripe / placeholder / failed — mark as active directly (dev mode)
     sub.status = "active";
+    sub.currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await sub.save();
     res.json({ url: null, subscriptionId: sub._id, activated: true });
   } catch (e) {
@@ -168,6 +169,7 @@ router.post("/razorpay-verify", requireAuth, async (req, res, next) => {
     }
 
     sub.status = "active";
+    sub.currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await sub.save();
 
     const plan = await Plan.findById(sub.planId);

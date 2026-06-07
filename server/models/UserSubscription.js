@@ -21,4 +21,14 @@ const userSubscriptionSchema = new mongoose.Schema(
 
 userSubscriptionSchema.index({ userId: 1 });
 
+userSubscriptionSchema.statics.getActiveForUser = async function (userId) {
+  const sub = await this.findOne({ userId, status: "active" }).populate("planId");
+  if (sub && sub.currentPeriodEnd && sub.currentPeriodEnd < new Date()) {
+    sub.status = "canceled";
+    await sub.save();
+    return null;
+  }
+  return sub;
+};
+
 export const UserSubscription = mongoose.model("UserSubscription", userSubscriptionSchema);

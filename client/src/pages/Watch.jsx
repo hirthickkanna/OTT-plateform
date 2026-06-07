@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import ContentRow from "../components/ContentRow";
 import VideoPlayer from "../components/VideoPlayer";
@@ -18,7 +18,22 @@ export default function Watch() {
   const [video, setVideo] = useState(null);
   const [playback, setPlayback] = useState(null);
   const [similar, setSimilar] = useState([]);
-  const { isAuthenticated } = useAuth();
+  const {
+    isAuthenticated,
+    isOffline,
+    isDownloaded,
+    isDownloading,
+    downloadProgress,
+    downloadMovie,
+    removeDownload,
+  } = useAuth();
+  const navigate = useNavigate();
+
+  const downloaded = isDownloaded(id);
+  const downloading = isDownloading(id);
+  const progress = downloadProgress[id] || 0;
+
+  const isPlayable = !isOffline || downloaded;
 
   useEffect(() => {
     setVideo(null);
@@ -57,12 +72,38 @@ export default function Watch() {
   return (
     <div className="pb-16">
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-10">
-        <Link to="/" className="inline-flex text-sm text-zinc-500 transition hover:text-white">
-          ← Back to movies
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link to="/" className="inline-flex text-sm text-zinc-500 transition hover:text-white">
+            ← Back to movies
+          </Link>
+          
+          {isOffline && (
+            <div className="inline-flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-xs text-amber-400">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+              Offline Playback Mode Active
+            </div>
+          )}
+        </div>
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-white/5 bg-black shadow-2xl">
-          {playback?.hlsUrl ? (
+          {!isPlayable ? (
+            <div className="flex aspect-video flex-col items-center justify-center bg-zinc-900 border border-white/5 p-6 text-center text-zinc-400 gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-md">
+                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="max-w-md">
+                <h3 className="text-lg font-bold text-white">Offline Playback Unavailable</h3>
+                <p className="mt-2 text-sm text-zinc-500">
+                  This movie is not downloaded on this device. Switch back to online mode in the navigation bar to stream.
+                </p>
+              </div>
+            </div>
+          ) : playback?.hlsUrl ? (
             <VideoPlayer src={playback.hlsUrl} onProgress={onProgress} />
           ) : (
             <div className="flex aspect-video items-center justify-center bg-zinc-900 text-zinc-500">
@@ -73,7 +114,57 @@ export default function Watch() {
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_280px]">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">{video.title}</h1>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">{video.title}</h1>
+              
+              {!isOffline && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      navigate("/login?reason=download");
+                      return;
+                    }
+                    if (downloaded) {
+                      removeDownload(id);
+                    } else if (!downloading) {
+                      downloadMovie(id);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all duration-300 shadow-lg shrink-0 ${
+                    downloaded
+                      ? "bg-zinc-800 border border-emerald-500/30 text-emerald-400 hover:bg-zinc-700"
+                      : downloading
+                      ? "bg-rose-600/20 text-rose-300 border border-rose-500/30 cursor-wait"
+                      : "bg-rose-600 hover:bg-rose-500 text-white"
+                  }`}
+                >
+                  {downloading ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Downloading {progress}%
+                    </>
+                  ) : downloaded ? (
+                    <>
+                      <svg className="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                      Downloaded (Remove)
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                      Download Movie
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               {video.year && (

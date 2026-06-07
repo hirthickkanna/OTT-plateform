@@ -15,7 +15,7 @@ const mobileNavClass = ({ isActive }) =>
   }`;
 
 export default function Navbar() {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isOffline, toggleOffline } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
@@ -124,6 +124,25 @@ export default function Navbar() {
               Search
             </button>
           </form>
+
+          {/* Offline Switch — desktop */}
+          {isAuthenticated && (
+            <button
+              type="button"
+              onClick={toggleOffline}
+              className={`hidden sm:flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold tracking-wide transition-all duration-300 ${
+                isOffline
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-lg shadow-amber-950/20"
+                  : "border-white/10 bg-zinc-900/60 text-zinc-400 hover:border-white/20 hover:text-white"
+              }`}
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOffline ? "bg-amber-400" : "bg-emerald-400"}`} />
+                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOffline ? "bg-amber-500" : "bg-emerald-500"}`} />
+              </span>
+              {isOffline ? "Offline Mode" : "Go Offline"}
+            </button>
+          )}
 
           {/* Auth — desktop */}
           <div className="hidden sm:flex items-center gap-3">
@@ -310,6 +329,31 @@ export default function Navbar() {
         <div className="border-t border-white/10 px-4 py-4">
           {isAuthenticated ? (
             <div className="flex flex-col gap-3">
+              {/* Offline Switch — Mobile */}
+              <button
+                type="button"
+                onClick={toggleOffline}
+                className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
+                  isOffline
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                    : "border-white/10 bg-zinc-900/60 text-zinc-400"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    {isOffline ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                    )}
+                  </svg>
+                  <span>Offline Mode</span>
+                </span>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOffline ? "bg-amber-400" : "bg-emerald-400"}`} />
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOffline ? "bg-amber-500" : "bg-emerald-500"}`} />
+                </span>
+              </button>
               <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-rose-700 text-sm font-bold text-white">
                   {(user?.displayName || user?.email || "U")[0].toUpperCase()}

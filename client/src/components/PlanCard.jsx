@@ -17,9 +17,12 @@ export default function PlanCard({ plan, featured, onSubscribe }) {
         </span>
       )}
       <h3 className="text-xl font-semibold text-white">{plan.name}</h3>
-      <div className="mt-4 flex items-baseline gap-1">
-        <span className="text-4xl font-bold tracking-tight text-white">₹{price}</span>
-        <span className="text-zinc-500">/{plan.interval || "month"}</span>
+      <div className="mt-4 flex flex-col gap-0.5">
+        <div className="flex items-baseline gap-1">
+          <span className="text-4xl font-bold tracking-tight text-white">₹{price}</span>
+          <span className="text-zinc-500">/30 days</span>
+        </div>
+        <span className="text-xs text-zinc-500 font-normal">One-time payment (No auto-renewal)</span>
       </div>
       <ul className="mt-6 flex-1 space-y-3">
         {plan.features?.map((feature) => (

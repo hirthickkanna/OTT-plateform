@@ -18,6 +18,7 @@ import streamingRoutes from "./routes/streaming.routes.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import videoRoutes from "./routes/video.routes.js";
+import downloadRoutes from "./routes/download.routes.js";
 import { startMediaServer } from "./services/mediaServer.js";
 
 import { fileURLToPath } from "url";
@@ -54,6 +55,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/live", liveRoutes);
 app.use("/api/creator", creatorRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/downloads", downloadRoutes);
 
 app.use(errorHandler);
 

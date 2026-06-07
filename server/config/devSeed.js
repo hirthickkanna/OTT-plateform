@@ -3,12 +3,15 @@ import { Plan } from "../models/Plan.js";
 import { User } from "../models/User.js";
 import { Video } from "../models/Video.js";
 import { UserSubscription } from "../models/UserSubscription.js";
+import { Payment } from "../models/Payment.js";
+
 
 const plans = [
   {
     name: "Basic",
     slug: "basic",
     priceCents: 50000,
+    currency: "inr",
     features: ["HD streaming", "1 device"],
     stripePriceId: "price_basic_placeholder",
   },
@@ -16,6 +19,7 @@ const plans = [
     name: "Premium",
     slug: "premium",
     priceCents: 100000,
+    currency: "inr",
     features: ["4K streaming", "4 devices", "DRM titles"],
     stripePriceId: "price_premium_placeholder",
   },
@@ -112,6 +116,10 @@ const demoMovies = [
 export async function ensureDevSeed() {
   if (process.env.NODE_ENV === "production") return;
 
+  // Make sure all plans and payments are updated to INR currency to enable all payment options in Razorpay test mode
+  await Plan.updateMany({ currency: "usd" }, { $set: { currency: "inr" } });
+  await Payment.updateMany({ currency: "usd" }, { $set: { currency: "inr" } });
+
   for (const p of plans) {
     await Plan.findOneAndUpdate({ slug: p.slug }, p, { upsert: true, new: true });
   }
@@ -152,6 +160,7 @@ export async function ensureDevSeed() {
         status: "active",
         fullName: "Demo Creator",
         phone: "+91 99999 99999",
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
       { upsert: true },
     );
@@ -164,6 +173,7 @@ export async function ensureDevSeed() {
         status: "active",
         fullName: "Demo Admin",
         phone: "+91 99999 88888",
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
       { upsert: true },
     );

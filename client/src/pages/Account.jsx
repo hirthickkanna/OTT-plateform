@@ -22,7 +22,7 @@ function InfoBadge({ label, value, icon }) {
 }
 
 export default function Account() {
-  const { isAuthenticated, user: authUser, logout } = useAuth();
+  const { isAuthenticated, user: authUser, logout, downloads, removeDownload } = useAuth();
   const [searchParams] = useSearchParams();
   const justSubscribed = searchParams.get("subscribed") === "1";
 
@@ -98,6 +98,9 @@ export default function Account() {
     : null;
   const planExpiry = sub?.currentPeriodEnd
     ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+  const daysRemaining = sub?.currentPeriodEnd
+    ? Math.ceil((new Date(sub.currentPeriodEnd) - new Date()) / (1000 * 60 * 60 * 24))
     : null;
 
   const initials = ((profile?.user?.displayName || authUser?.email || "U")[0]).toUpperCase();
@@ -290,7 +293,20 @@ export default function Account() {
                     <span className="ml-auto rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-400">Active</span>
                   </div>
                   {planExpiry && (
-                    <p className="text-xs text-zinc-500 text-center">Renews on {planExpiry}</p>
+                    <p className="text-xs text-zinc-500 text-center">Expires on {planExpiry} (No auto-renewal)</p>
+                  )}
+                  {daysRemaining !== null && daysRemaining <= 3 && daysRemaining >= 0 && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-600/10 p-4 text-amber-400">
+                      <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white">Your plan is expiring soon!</p>
+                        <p className="mt-1 text-xs text-zinc-400 leading-normal">
+                          Only {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left of your subscription. Choose a plan to renew and keep streaming.
+                        </p>
+                      </div>
+                    </div>
                   )}
                   {sub.planId?.features?.length > 0 && (
                     <ul className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -319,6 +335,70 @@ export default function Account() {
                   >
                     Browse Plans
                   </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Offline Downloads */}
+            <div className="rounded-2xl border border-white/8 bg-zinc-900/60 p-6 backdrop-blur-sm">
+              <h3 className="mb-4 text-base font-semibold text-white">Offline Downloads</h3>
+              
+              {downloads?.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {downloads.map((movie) => {
+                    const posterUrl = movie.thumbnailUrl;
+                    const initials = movie.title.charAt(0).toUpperCase();
+                    return (
+                      <div key={movie._id} className="group relative flex flex-col rounded-xl border border-white/5 bg-zinc-800/20 overflow-hidden hover:border-rose-500/20 transition-all duration-300">
+                        <div className="relative aspect-video w-full bg-zinc-900 overflow-hidden">
+                          {posterUrl ? (
+                            <img src={posterUrl} alt={movie.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900 text-2xl font-bold text-white/10">
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col justify-between">
+                          <div>
+                            <h4 className="font-semibold text-sm text-white line-clamp-1 group-hover:text-rose-300 transition-colors">
+                              {movie.title}
+                            </h4>
+                            <p className="mt-0.5 text-xs text-zinc-500">
+                              {movie.genre || "Movie"} &middot; {movie.year || "N/A"}
+                            </p>
+                          </div>
+                          <div className="mt-3 flex items-center gap-2">
+                            <Link
+                              to={`/watch/${movie._id}`}
+                              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                              Watch
+                            </Link>
+                            <button
+                              onClick={() => removeDownload(movie._id)}
+                              title="Delete Download"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-zinc-400 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-6 text-center text-zinc-500">
+                  <svg className="h-8 w-8 opacity-40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  <p className="text-xs">No downloads found in your account.</p>
                 </div>
               )}
             </div>

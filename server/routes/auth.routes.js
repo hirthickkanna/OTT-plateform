@@ -95,10 +95,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
     const user = await User.findById(req.user.id).select("-passwordHash -firebaseUid");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const subscription = await UserSubscription.findOne({
-      userId: req.user.id,
-      status: "active",
-    }).populate("planId");
+    const subscription = await UserSubscription.getActiveForUser(req.user.id);
 
     const watchCount = await WatchHistory.countDocuments({ userId: req.user.id });
 

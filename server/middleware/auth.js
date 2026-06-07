@@ -48,7 +48,7 @@ export async function requireAuth(req, _res, next) {
     if (e.name === "JsonWebTokenError" || e.name === "TokenExpiredError") {
       return next(new AppError("Token invalid or expired. Please log in again.", 401));
     }
-    next(new AppError(e.message || "Unauthorized", 401));
+    next(new AppError(e.message || "Internal Server Error", 500));
   }
 }
 

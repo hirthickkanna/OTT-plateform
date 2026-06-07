@@ -10,7 +10,7 @@ const labelCls = "mb-1.5 block text-sm font-medium text-zinc-300";
 export default function SubscribeForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loadProfile } = useAuth();
   const planId = searchParams.get("plan");
 
   const [plan, setPlan] = useState(null);
@@ -99,6 +99,7 @@ export default function SubscribeForm() {
                 }),
               });
               if (verifyRes.success) {
+                await loadProfile();
                 navigate("/account?subscribed=1");
               } else {
                 setError("Payment verification failed.");
@@ -125,6 +126,7 @@ export default function SubscribeForm() {
         window.location.href = res.url;
       } else {
         // Dev mode — no Stripe or Razorpay, plan activated directly
+        await loadProfile();
         navigate("/account?subscribed=1");
       }
     } catch (e) {
@@ -296,7 +298,7 @@ export default function SubscribeForm() {
                   <span className="text-lg font-semibold text-white">{plan.name}</span>
                   <span className="text-2xl font-bold text-white">₹{price}</span>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">per {plan.interval || "month"} • billed monthly</p>
+                <p className="text-xs text-zinc-500 mt-1">30 days access • One-time payment</p>
 
                 <hr className="my-4 border-white/5" />
 
@@ -324,7 +326,7 @@ export default function SubscribeForm() {
                 <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span>Cancel or change plan anytime</span>
+                <span>Automatically expires after 30 days (no auto-renewal)</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">

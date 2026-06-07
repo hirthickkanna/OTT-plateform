@@ -45,6 +45,7 @@ router.post("/webhook", async (req, res) => {
           planId,
           status: "active",
           stripeSubscriptionId: session.subscription,
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
         { upsert: true, new: true },
       );

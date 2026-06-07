@@ -51,7 +51,7 @@ router.get("/playback/:videoId", optionalAuth, async (req, res, next) => {
     }
 
     if (video.drmEnabled && req.user?.id) {
-      const sub = await UserSubscription.findOne({ userId: req.user.id, status: "active" });
+      const sub = await UserSubscription.getActiveForUser(req.user.id);
       if (!sub) throw new AppError("Active subscription required", 403);
     }
 
@@ -127,7 +127,7 @@ router.get("/key/:videoId", async (req, res, next) => {
       throw new AppError("User not found", 401);
     }
 
-    const sub = await UserSubscription.findOne({ userId: user._id, status: "active" });
+    const sub = await UserSubscription.getActiveForUser(user._id);
     if (!sub) {
       throw new AppError("Active subscription required to play secured content", 403);
     }

@@ -4,7 +4,7 @@ const paymentSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     amountCents: { type: Number, required: true },
-    currency: { type: String, default: "usd" },
+    currency: { type: String, default: "inr" },
     stripePaymentId: String,
     razorpayPaymentId: String,
     razorpayOrderId: String,
