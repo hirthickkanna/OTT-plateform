@@ -1,4 +1,5 @@
-import admin from "firebase-admin";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -7,21 +8,19 @@ const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 let firebaseApp = null;
 
-if (projectId && clientEmail && privateKey) {
-  try {
-    firebaseApp = admin.initializeApp({
-      credential: admin.credential.cert({
+try {
+  if (projectId && clientEmail && privateKey) {
+    firebaseApp = initializeApp({
+      credential: cert({
         projectId,
         clientEmail,
         privateKey,
       }),
     });
     console.log("Firebase Admin SDK successfully initialized.");
-  } catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error);
   }
-} else {
-  console.warn("Firebase Admin SDK environment variables are missing. Firebase Auth will operate in developer-mock mode for testing.");
+} catch (error) {
+  console.error("Firebase Admin SDK initialization failed:", error);
 }
 
 export async function verifyFirebaseToken(idToken) {
@@ -45,7 +44,7 @@ export async function verifyFirebaseToken(idToken) {
   }
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await getAuth(firebaseApp).verifyIdToken(idToken);
     return {
       uid: decodedToken.uid,
       email: decodedToken.email,
