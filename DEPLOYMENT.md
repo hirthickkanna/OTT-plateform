@@ -51,9 +51,9 @@ You can deploy the backend using the Render **Blueprint** (recommended, configur
 1. Go to the [Render Dashboard](https://dashboard.render.com).
 2. Click **New** > **Blueprint**.
 3. Connect your repository. Render will automatically read the [render.yaml](file:///e:/OTT%20platform/render.yaml) file and provision:
-   - **ott-redis**: Managed Redis database instance for BullMQ jobs.
-   - **ott-api**: Express API Gateway service.
-   - **ott-transcoder**: Background BullMQ transcoding worker.
+    - **ott-redis**: Managed Key Value (Redis-compatible) cache instance for BullMQ jobs.
+    - **ott-api**: Express API Gateway service.
+    - **ott-transcoder**: Background BullMQ transcoding worker.
 4. Input the required environment variables prompted by the dashboard (e.g., `MONGODB_URI`, `CLIENT_URL`, `CORS_ORIGINS`, `API_URL`).
 5. Click **Apply**.
 
@@ -63,10 +63,10 @@ You can deploy the backend using the Render **Blueprint** (recommended, configur
 
 If you prefer to configure each service manually:
 
-#### 1. Provision Redis Cache
-1. Click **New** > **Redis** on Render.
+#### 1. Provision Key Value Cache
+1. Click **New** > **Key Value** on Render.
 2. Name it `ott-redis`, choose a plan (Free works for dev/staging), and create it.
-3. Save the **Internal Redis URL** (e.g., `redis://red-xxxxxxxx:6379`).
+3. Save the **Connection String** (Internal Redis URL).
 
 #### 2. Deploy Web Service (Express API Server)
 1. Click **New** > **Web Service**.
@@ -92,6 +92,9 @@ If you prefer to configure each service manually:
      - `FIREBASE_PRIVATE_KEY`: *Firebase Private Key (surrounded by quotes, with newline characters `\n` preserved)*
 
 #### 3. Deploy Background Worker (FFmpeg Transcoder)
+> [!NOTE]
+> Render background workers do not have a free tier. Select a paid plan (such as **Starter**) during manual creation.
+
 1. Click **New** > **Background Worker**.
 2. Connect your Git repository.
 3. Configure:
@@ -101,7 +104,7 @@ If you prefer to configure each service manually:
    - **Start Command**: `node workers/transcode/index.js`
 4. Add the following Environment Variables:
    - `NODE_ENV`: `production`
-   - `REDIS_URL`: *Internal Redis connection URL from Step 1*
+   - `REDIS_URL`: *Internal Key Value connection URL from Step 1*
    - `API_URL`: *Internal/External Express API Web Service URL* (e.g., `http://ott-api:10000` or `https://ott-api.onrender.com`)
    - `WORKER_SECRET`: *Must match the `WORKER_SECRET` set on the Express API server*
 

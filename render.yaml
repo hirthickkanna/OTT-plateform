@@ -27,7 +27,7 @@ services:
         generateValue: true # Generates a secure random 256-bit JWT secret automatically
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: ott-redis
           property: connectionString
       - key: CLIENT_URL
@@ -43,7 +43,7 @@ services:
   - type: worker
     name: ott-transcoder
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm install
     startCommand: node workers/transcode/index.js
     envVars:
@@ -51,19 +51,16 @@ services:
         value: production
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: ott-redis
           property: connectionString
       - key: API_URL
-        fromService:
-          type: web
-          name: ott-api
-          property: host # Auto-resolves to the Express Web Service host URL
+        value: http://ott-api:10000
     envVarGroups:
       - name: ott-shared-secrets
 
   # 3. Managed Redis Instance
-  - type: redis
+  - type: keyvalue
     name: ott-redis
     plan: free
     ipAllowList: [] # Restricts access to internal services only for enhanced security
