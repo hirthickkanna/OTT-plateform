@@ -2,6 +2,12 @@
 # Deploy database, redis cache, backend API, and worker with one click.
 # Learn more at: https://render.com/docs/blueprints
 
+envVarGroups:
+  - name: ott-shared-secrets
+    envVars:
+      - key: WORKER_SECRET
+        generateValue: true # Generates a single secure random worker communications secret shared by both services
+
 services:
   # 1. Express API Backend Web Service
   - type: web
@@ -19,8 +25,6 @@ services:
         sync: false # User must input their MongoDB connection URI (e.g., MongoDB Atlas)
       - key: JWT_SECRET
         generateValue: true # Generates a secure random 256-bit JWT secret automatically
-      - key: WORKER_SECRET
-        generateValue: true # Generates a secure random worker communications secret
       - key: REDIS_URL
         fromService:
           type: redis
@@ -32,6 +36,8 @@ services:
         sync: false # Input Vercel Frontend URL for CORS permissions
       - key: API_URL
         sync: false # Render external Web Service URL (e.g., https://ott-api.onrender.com)
+    envVarGroups:
+      - name: ott-shared-secrets
 
   # 2. BullMQ Transcoding Background Worker
   - type: worker
@@ -53,11 +59,8 @@ services:
           type: web
           name: ott-api
           property: host # Auto-resolves to the Express Web Service host URL
-      - key: WORKER_SECRET
-        fromService:
-          type: web
-          name: ott-api
-          property: WORKER_SECRET
+    envVarGroups:
+      - name: ott-shared-secrets
 
   # 3. Managed Redis Instance
   - type: redis
