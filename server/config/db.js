@@ -9,9 +9,10 @@ function isAtlasUri(uri) {
 }
 
 async function tryConnect(uri, label) {
-  await mongoose.connect(uri, { 
+  // MED-2 FIX: Removed tlsAllowInvalidCertificates: true — it disabled TLS certificate
+  // verification and left connections vulnerable to MITM attacks.
+  await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 8000,
-    tlsAllowInvalidCertificates: true
   });
   console.log(`MongoDB connected (${label})`);
 }

@@ -1,10 +1,22 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { requireAuth } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Download } from "../models/Download.js";
 import { Video } from "../models/Video.js";
 
 const router = Router();
+
+/**
+ * MED-6 FIX: Validate that a string is a valid MongoDB ObjectId before querying.
+ * Passing an invalid ObjectId to findById() throws an unhandled CastError that
+ * leaks stack information and can crash the request.
+ */
+function validateObjectId(id, fieldName = "ID") {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new AppError(`Invalid ${fieldName}`, 400);
+  }
+}
 
 // GET /api/downloads — Fetch user's downloads populated with video details
 router.get("/", requireAuth, async (req, res, next) => {
@@ -38,6 +50,9 @@ router.post("/", requireAuth, async (req, res, next) => {
       throw new AppError("Video ID is required", 400);
     }
 
+    // MED-6: Validate ObjectId before hitting the DB
+    validateObjectId(videoId, "video ID");
+
     // Verify video exists
     const video = await Video.findById(videoId);
     if (!video) {
@@ -65,8 +80,11 @@ router.delete("/:videoId", requireAuth, async (req, res, next) => {
       throw new AppError("Video ID is required", 400);
     }
 
+    // MED-6: Validate ObjectId before hitting the DB
+    validateObjectId(videoId, "video ID");
+
     const result = await Download.deleteOne({ userId: req.user.id, videoId });
-    
+
     if (result.deletedCount === 0) {
       throw new AppError("Download record not found", 404);
     }

@@ -27,14 +27,13 @@ export default function VideoPlayer({ src, onProgress }) {
       if (Hls.isSupported()) {
         console.log("[VideoPlayer] Initializing Hls.js for source:", normalizedSrc);
         hls = new Hls({
+          // LOW-1 FIX: Use credentials (httpOnly cookie) instead of localStorage token.
+          // The browser automatically sends the cookie when withCredentials is true.
           xhrSetup: function (xhr, url) {
             if (url.includes("/api/streaming/key/")) {
-              const token = localStorage.getItem("token");
-              if (token) {
-                xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-              }
+              xhr.withCredentials = true; // send the httpOnly auth cookie
             }
-          }
+          },
         });
         hls.loadSource(normalizedSrc);
         hls.attachMedia(video);

@@ -27,6 +27,8 @@ const videoStorage = multer.diskStorage({
 });
 
 const videoFileFilter = (_req, file, cb) => {
+  // HIGH-4: Removed "application/octet-stream" — it's the generic binary type and
+  // would allow any executable, script, or malicious binary to be uploaded.
   const allowedMime = [
     "video/mp4",
     "video/webm",
@@ -37,15 +39,18 @@ const videoFileFilter = (_req, file, cb) => {
     "application/x-matroska",
     "video/avi",
     "video/x-msvideo",
-    "application/octet-stream"
   ];
   const ext = path.extname(file.originalname).toLowerCase();
   const allowedExt = [".mp4", ".webm", ".ogg", ".mov", ".mkv", ".avi"];
 
-  if (allowedMime.includes(file.mimetype) || allowedExt.includes(ext)) {
+  // Both MIME and extension must be valid — extension alone is not sufficient
+  const mimeOk = allowedMime.includes(file.mimetype);
+  const extOk = allowedExt.includes(ext);
+
+  if (mimeOk && extOk) {
     cb(null, true);
   } else {
-    cb(new AppError(`Unsupported file type: ${file.mimetype}. Allowed: MP4, WebM, MOV, MKV, AVI`, 400));
+    cb(new AppError(`Unsupported file type: ${file.mimetype} (${ext}). Allowed: MP4, WebM, MOV, MKV, AVI`, 400));
   }
 };
 

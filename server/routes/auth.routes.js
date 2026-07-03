@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { body, validationResult } from "express-validator";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import * as authService from "../services/auth.service.js";
@@ -10,6 +11,46 @@ import { WatchHistory } from "../models/WatchHistory.js";
 
 const router = Router();
 
+// ── HIGH-1: Rate limiters for auth endpoints ──────────────────────────────────
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                   // max 10 login attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts. Please try again after 15 minutes." },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,                    // max 5 registrations per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many accounts created from this IP. Please try again later." },
+});
+
+const firebaseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again shortly." },
+});
+
+// ── Cookie helper ─────────────────────────────────────────────────────────────
+function setAuthCookie(res, token) {
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("token", token, {
+    httpOnly: true,             // LOW-1: inaccessible to JavaScript
+    secure: isProduction,       // HTTPS only in production
+    sameSite: "Strict",         // CSRF protection
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches JWT_EXPIRES_IN)
+  });
+}
+
+function clearAuthCookie(res) {
+  res.clearCookie("token", { httpOnly: true, sameSite: "Strict" });
+}
+
 function validate(req) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) throw new AppError(errors.array()[0].msg, 400);
@@ -17,7 +58,8 @@ function validate(req) {
 
 router.post(
   "/register",
-  body("email").isEmail(),
+  registerLimiter,
+  body("email").isEmail().normalizeEmail(),
   body("password").isLength({ min: 8 }),
   body("deviceId").notEmpty(),
   body("deviceName").notEmpty(),
@@ -25,6 +67,7 @@ router.post(
     try {
       validate(req);
       const result = await authService.register(req.body);
+      setAuthCookie(res, result.accessToken);
       res.status(201).json(result);
     } catch (e) {
       next(e);
@@ -34,14 +77,17 @@ router.post(
 
 router.post(
   "/login",
-  body("email").isEmail(),
+  loginLimiter,
+  body("email").isEmail().normalizeEmail(),
   body("password").notEmpty(),
   body("deviceId").notEmpty(),
   body("deviceName").notEmpty(),
   async (req, res, next) => {
     try {
       validate(req);
-      res.json(await authService.login(req.body));
+      const result = await authService.login(req.body);
+      setAuthCookie(res, result.accessToken);
+      res.json(result);
     } catch (e) {
       next(e);
     }
@@ -50,6 +96,7 @@ router.post(
 
 router.post(
   "/firebase",
+  firebaseLimiter,
   body("idToken").notEmpty(),
   body("deviceId").notEmpty(),
   body("deviceName").notEmpty(),
@@ -58,7 +105,7 @@ router.post(
       validate(req);
       const { idToken, deviceId, deviceName } = req.body;
       const firebaseUser = await verifyFirebaseToken(idToken);
-      
+
       const result = await authService.firebaseAuth({
         email: firebaseUser.email,
         uid: firebaseUser.uid,
@@ -66,12 +113,19 @@ router.post(
         deviceId,
         deviceName,
       });
+      setAuthCookie(res, result.accessToken);
       res.json(result);
     } catch (e) {
       next(e);
     }
   },
 );
+
+// POST /api/auth/logout — clears the auth cookie
+router.post("/logout", (req, res) => {
+  clearAuthCookie(res);
+  res.json({ ok: true });
+});
 
 router.get("/devices", requireAuth, async (req, res, next) => {
   try {
@@ -148,4 +202,3 @@ router.patch("/me", requireAuth, async (req, res, next) => {
 });
 
 export default router;
-

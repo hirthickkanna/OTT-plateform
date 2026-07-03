@@ -90,7 +90,7 @@ function UploadZone({ videoId, onDone }) {
     setProgress(0);
     setErrMsg("");
 
-    const token = localStorage.getItem("token");
+    // LOW-1 FIX: Use httpOnly cookie for auth — no localStorage token needed
     const form  = new FormData();
     form.append("video", file);
 
@@ -125,7 +125,7 @@ function UploadZone({ videoId, onDone }) {
     });
 
     xhr.open("POST", `/api/upload/${videoId}`);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.withCredentials = true; // send httpOnly cookie
     xhr.send(form);
   };
 
@@ -247,13 +247,13 @@ function PosterUploadZone({ videoId, currentPoster, onDone }) {
     if (!selectedFile || state !== "preview") return;
 
     setState("uploading");
-    const token = localStorage.getItem("token");
+    // LOW-1 FIX: Use credentials (httpOnly cookie) instead of localStorage token
     const form = new FormData();
     form.append("poster", selectedFile);
 
     fetch(`/api/upload/${videoId}/poster`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include", // send httpOnly cookie
       body: form,
     })
       .then(async (r) => {

@@ -25,7 +25,9 @@ const config = {
   },
   http: {
     port: 8000,
-    allow_origin: "*"
+    // MED-8 FIX: Restrict to known client origin instead of wildcard "*"
+    // Wildcard allowed any website to pull live HLS streams without authorization.
+    allow_origin: process.env.CLIENT_URL || "http://localhost:5173",
   },
   static: {
     router: "/",

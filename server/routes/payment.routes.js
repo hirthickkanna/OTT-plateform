@@ -38,6 +38,19 @@ router.post("/webhook", async (req, res) => {
     const session = event.data.object;
     const { userId, planId } = session.metadata || {};
     if (userId && planId) {
+      // MED-3 FIX: Use the actual subscription period from Stripe instead of hardcoded 30 days
+      let currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // fallback
+      if (session.subscription) {
+        try {
+          const stripeSub = await s.subscriptions.retrieve(session.subscription);
+          if (stripeSub?.current_period_end) {
+            currentPeriodEnd = new Date(stripeSub.current_period_end * 1000);
+          }
+        } catch (err) {
+          console.error("Failed to retrieve Stripe subscription period:", err.message);
+        }
+      }
+
       await UserSubscription.findOneAndUpdate(
         { userId },
         {
@@ -45,7 +58,7 @@ router.post("/webhook", async (req, res) => {
           planId,
           status: "active",
           stripeSubscriptionId: session.subscription,
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          currentPeriodEnd,
         },
         { upsert: true, new: true },
       );

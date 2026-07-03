@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { body, validationResult } from "express-validator";
+import escapeStringRegexp from "escape-string-regexp";
 import { requireAuth } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Video } from "../models/Video.js";
@@ -10,10 +11,13 @@ router.get("/", async (req, res, next) => {
   try {
     const query = { status: "ready", isLive: false, isApproved: true };
     if (req.query.search) {
+      // MED-1: Escape user input before using as MongoDB $regex to prevent ReDoS
+      const rawSearch = String(req.query.search).slice(0, 100); // max 100 chars
+      const safeSearch = escapeStringRegexp(rawSearch);
       query.$or = [
-        { title: { $regex: req.query.search, $options: "i" } },
-        { description: { $regex: req.query.search, $options: "i" } },
-        { genre: { $regex: req.query.search, $options: "i" } }
+        { title: { $regex: safeSearch, $options: "i" } },
+        { description: { $regex: safeSearch, $options: "i" } },
+        { genre: { $regex: safeSearch, $options: "i" } },
       ];
     }
     const videos = await Video.find(query)

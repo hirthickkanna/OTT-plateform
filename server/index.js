@@ -1,6 +1,8 @@
 import "./config/env.js";
 import cors from "cors";
 import express from "express";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import path from "path";
 import fs from "fs";
 import { connectDB } from "./config/db.js";
@@ -27,7 +29,35 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
+// ── Security Headers (LOW-2) ──────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // allow media files to be served
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+}));
+
+// ── CORS (HIGH-2) — read comma-separated CORS_ORIGINS from env ────────────────
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, same-origin)
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS: origin '${origin}' is not allowed`));
+  },
+  credentials: true, // required for httpOnly cookies
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// ── Cookie parser (LOW-1) ─────────────────────────────────────────────────────
+app.use(cookieParser());
+
+// ── Body parsers ──────────────────────────────────────────────────────────────
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
@@ -59,11 +89,31 @@ app.use("/api/downloads", downloadRoutes);
 
 app.use(errorHandler);
 
+// ── NEW-MED-1: Startup secrets validation ─────────────────────────────────────
+// Fail loudly in production if critical secrets are missing or insecure.
+// This prevents the silent "dev-secret" fallback from ever reaching production.
+if (process.env.NODE_ENV === "production") {
+  const missingSecrets = [];
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret" || process.env.JWT_SECRET.length < 32) {
+    missingSecrets.push("JWT_SECRET (must be 32+ chars, not 'dev-secret')");
+  }
+  if (!process.env.MONGODB_URI) {
+    missingSecrets.push("MONGODB_URI");
+  }
+  if (missingSecrets.length > 0) {
+    console.error("[SECURITY] Missing or insecure production secrets:");
+    missingSecrets.forEach((s) => console.error(`  - ${s}`));
+    process.exit(1);
+  }
+}
+
 await connectDB();
 await ensureDevSeed();
 startMediaServer();
 
-const server = app.listen(PORT, "0.0.0.0", () => console.log(`API http://127.0.0.1:${PORT}`));
+// ── LOW-3: Bind to localhost in dev, all interfaces in production ──────────────
+const bindHost = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+const server = app.listen(PORT, bindHost, () => console.log(`API http://${bindHost}:${PORT}`));
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
     console.error(`Port ${PORT} is already in use. Stop the other process, then restart.`);

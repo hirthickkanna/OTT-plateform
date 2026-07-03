@@ -12,12 +12,16 @@ import {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  // LOW-1 FIX: We no longer store the JWT in localStorage.
+  // The server sets it as an httpOnly cookie (inaccessible to JS/XSS).
+  // We keep user metadata in localStorage for UI purposes only (not sensitive).
   const [user, setUser] = useState(() => {
     const u = localStorage.getItem("user");
-    return u ? JSON.parse(u) : null;
+    try { return u ? JSON.parse(u) : null; } catch { return null; }
   });
   const [subscription, setSubscription] = useState(null);
+  // Derive auth state from user object rather than a token in localStorage
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem("user"));
 
   const [isOffline, setIsOffline] = useState(() => {
     return localStorage.getItem("isOfflineMode") === "true";
@@ -25,11 +29,7 @@ export function AuthProvider({ children }) {
   const [downloads, setDownloads] = useState(() => {
     const cached = localStorage.getItem("localDownloads");
     if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch (e) {
-        return [];
-      }
+      try { return JSON.parse(cached); } catch { return []; }
     }
     return [];
   });
@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
   };
 
   const loadDownloads = async () => {
-    if (!localStorage.getItem("token")) return;
+    if (!isAuthenticated) return;
     try {
       const data = await api("/api/downloads");
       setDownloads(data);
@@ -53,28 +53,22 @@ export function AuthProvider({ children }) {
       console.error("Failed to load downloads from database", e);
       const cached = localStorage.getItem("localDownloads");
       if (cached) {
-        try {
-          setDownloads(JSON.parse(cached));
-        } catch (err) {
-          console.error("Failed to parse cached local downloads", err);
-        }
+        try { setDownloads(JSON.parse(cached)); } catch {}
       }
     }
   };
 
   const downloadMovie = async (videoId) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     if (isDownloaded(videoId) || isDownloading(videoId)) return;
 
     setDownloadProgress((prev) => ({ ...prev, [videoId]: 0 }));
-    
+
     let currentPct = 0;
     const interval = setInterval(() => {
       currentPct += 20;
       setDownloadProgress((prev) => ({ ...prev, [videoId]: Math.min(currentPct, 100) }));
-      if (currentPct >= 100) {
-        clearInterval(interval);
-      }
+      if (currentPct >= 100) clearInterval(interval);
     }, 400);
 
     setTimeout(async () => {
@@ -97,27 +91,20 @@ export function AuthProvider({ children }) {
   };
 
   const removeDownload = async (videoId) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     try {
-      await api(`/api/downloads/${videoId}`, {
-        method: "DELETE",
-      });
+      await api(`/api/downloads/${videoId}`, { method: "DELETE" });
       await loadDownloads();
     } catch (e) {
       console.error("Failed to delete download", e);
     }
   };
 
-  const isDownloaded = (videoId) => {
-    return downloads.some((d) => d._id === videoId);
-  };
-
-  const isDownloading = (videoId) => {
-    return downloadProgress[videoId] !== undefined;
-  };
+  const isDownloaded = (videoId) => downloads.some((d) => d._id === videoId);
+  const isDownloading = (videoId) => downloadProgress[videoId] !== undefined;
 
   const loadProfile = async () => {
-    if (!localStorage.getItem("token")) return;
+    if (!isAuthenticated) return;
     try {
       const data = await api("/api/auth/me");
       setSubscription(data.subscription);
@@ -129,7 +116,7 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    if (token) {
+    if (isAuthenticated) {
       loadProfile();
       loadDownloads();
     } else {
@@ -138,7 +125,17 @@ export function AuthProvider({ children }) {
       setIsOffline(false);
       localStorage.removeItem("isOfflineMode");
     }
-  }, [token]);
+  }, [isAuthenticated]);
+
+  /**
+   * After server sets httpOnly cookie, store only user metadata (not the token) in localStorage.
+   * LOW-1: The actual JWT lives only in the httpOnly cookie — never in localStorage.
+   */
+  function persistUser(userData) {
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
+    setIsAuthenticated(true);
+  }
 
   const exchangeToken = async (idToken) => {
     const data = await api("/api/auth/firebase", {
@@ -149,73 +146,101 @@ export function AuthProvider({ children }) {
         deviceName: navigator.userAgent.slice(0, 80),
       }),
     });
-    localStorage.setItem("token", data.accessToken);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    setToken(data.accessToken);
-    setUser(data.user);
+    // LOW-1: Do NOT store data.accessToken in localStorage — the server sets it as httpOnly cookie.
+    // We only persist the user metadata for UI state.
+    persistUser(data.user);
     return data;
   };
 
   const login = async (email, password) => {
-    let idToken;
     const cleanEmail = email.trim().toLowerCase();
+
+    // MED-5 FIX: Mock login bypass (.local emails) is only allowed in DEV mode.
+    // In production builds (import.meta.env.PROD), all logins go through Firebase.
     const isMockEmail = cleanEmail.endsWith(".local");
+    if (isMockEmail && !import.meta.env.DEV) {
+      throw new Error("Mock login is disabled in production.");
+    }
+
+    let idToken;
     if (auth && !isMockEmail) {
       const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
       idToken = await userCredential.user.getIdToken();
     } else {
-      console.warn("Using dev mock login token");
-      idToken = `dev-mock-token-${cleanEmail}`;
+      if (import.meta.env.DEV) {
+        console.warn("Using dev mock login token");
+        idToken = `dev-mock-token-${cleanEmail}`;
+      } else {
+        throw new Error("Firebase not configured.");
+      }
     }
     return exchangeToken(idToken);
   };
 
   const register = async (email, password, displayName) => {
-    let idToken;
     const cleanEmail = email.trim().toLowerCase();
     const isMockEmail = cleanEmail.endsWith(".local");
+
+    // MED-5 FIX: Same mock-only-in-dev guard for registration
+    if (isMockEmail && !import.meta.env.DEV) {
+      throw new Error("Mock registration is disabled in production.");
+    }
+
+    let idToken;
     if (auth && !isMockEmail) {
       const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       await updateProfile(userCredential.user, { displayName });
       idToken = await userCredential.user.getIdToken();
     } else {
-      console.warn("Using dev mock registration token");
-      idToken = `dev-mock-token-${cleanEmail}`;
+      if (import.meta.env.DEV) {
+        console.warn("Using dev mock registration token");
+        idToken = `dev-mock-token-${cleanEmail}`;
+      } else {
+        throw new Error("Firebase not configured.");
+      }
     }
     return exchangeToken(idToken);
   };
 
   const signInWithGoogle = async () => {
-    let idToken;
     if (auth && googleProvider) {
       const userCredential = await signInWithPopup(auth, googleProvider);
-      idToken = await userCredential.user.getIdToken();
-    } else {
+      const idToken = await userCredential.user.getIdToken();
+      return exchangeToken(idToken);
+    }
+
+    // MED-5 FIX: Google mock sign-in only allowed in DEV
+    if (import.meta.env.DEV) {
       console.warn("Firebase client not configured. Prompting for dev mock Google sign-in...");
       const email = prompt("Enter a test email to simulate Google Sign-In:", "google-user@example.com");
       if (!email) return null;
-      idToken = `dev-mock-token-${email}`;
+      const idToken = `dev-mock-token-${email}`;
+      return exchangeToken(idToken);
     }
-    return exchangeToken(idToken);
+
+    throw new Error("Google sign-in is not configured.");
   };
 
   const logout = async () => {
     if (auth) {
       await signOut(auth).catch((err) => console.error("Firebase sign out failed", err));
     }
-    localStorage.removeItem("token");
+    // Call the backend logout endpoint to clear the httpOnly cookie
+    try {
+      await api("/api/auth/logout", { method: "POST" });
+    } catch {}
+    // Clear only UI state from localStorage (no token was stored here)
     localStorage.removeItem("user");
     localStorage.removeItem("isOfflineMode");
     localStorage.removeItem("localDownloads");
-    setToken(null);
     setUser(null);
+    setIsAuthenticated(false);
     setDownloads([]);
     setIsOffline(false);
   };
 
   const value = useMemo(
     () => ({
-      token,
       user,
       subscription,
       loadProfile,
@@ -223,7 +248,7 @@ export function AuthProvider({ children }) {
       register,
       signInWithGoogle,
       logout,
-      isAuthenticated: !!token,
+      isAuthenticated,
       isFirebaseMock: !auth,
       isOffline,
       toggleOffline,
@@ -234,7 +259,7 @@ export function AuthProvider({ children }) {
       isDownloaded,
       isDownloading,
     }),
-    [token, user, subscription, isOffline, downloads, downloadProgress],
+    [user, subscription, isAuthenticated, isOffline, downloads, downloadProgress],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -43,7 +43,7 @@ async function transcode(videoId, sourcePath) {
   fs.writeFileSync(keyPath, keyBytes);
 
   // Write keyinfo file (Line 1: Key server URL, Line 2: Path to key file)
-  const keyUrl = `${API}/api/streaming/key/${videoId}`;
+  const keyUrl = `/api/streaming/key/${videoId}`;
   const keyInfoContent = `${keyUrl}\n${keyPath.replace(/\\/g, "/")}\n`;
   fs.writeFileSync(keyInfoPath, keyInfoContent);
 

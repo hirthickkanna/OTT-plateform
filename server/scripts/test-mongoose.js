@@ -10,7 +10,7 @@ console.log("Connecting to:", uri);
 try {
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 8000,
-    tlsAllowInvalidCertificates: true,
+    // NEW-LOW-1 FIX: Do NOT use tlsAllowInvalidCertificates — it disables TLS verification.
   });
   console.log("Connected successfully to Atlas via Mongoose!");
   await mongoose.disconnect();

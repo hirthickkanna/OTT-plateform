@@ -162,8 +162,8 @@ router.post("/razorpay-verify", requireAuth, async (req, res, next) => {
       throw new AppError("Invalid payment signature", 400);
     }
 
-    // Update pending subscription to active
-    const sub = await UserSubscription.findById(subscriptionId);
+    // MED-4 FIX: Verify the subscription belongs to the requesting user
+    const sub = await UserSubscription.findOne({ _id: subscriptionId, userId: req.user.id });
     if (!sub) {
       throw new AppError("Subscription not found", 404);
     }

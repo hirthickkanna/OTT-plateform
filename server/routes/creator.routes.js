@@ -3,22 +3,24 @@ import mongoose from "mongoose";
 import { requireAuth } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { Payment } from "../models/Payment.js";
-import { User } from "../models/User.js";
 import { Video } from "../models/Video.js";
 
 const router = Router();
 
-async function ensureCreator(req) {
-  const user = await User.findById(req.user.id);
-  if (!user) throw new AppError("User not found", 404);
-  if (user.role !== "creator" && user.role !== "admin") {
-    await User.updateOne({ _id: user._id }, { role: "creator" });
+/**
+ * CRIT-3 FIX: Removed the previous ensureCreator() function that auto-promoted
+ * any authenticated viewer to "creator" role. Now we strictly require the user
+ * to already have the "creator" or "admin" role — an admin must grant it explicitly.
+ */
+function requireCreator(req, _res, next) {
+  if (req.user?.role !== "creator" && req.user?.role !== "admin") {
+    return next(new AppError("Creator access required. Contact an administrator to upgrade your account.", 403));
   }
+  next();
 }
 
-router.get("/dashboard", requireAuth, async (req, res, next) => {
+router.get("/dashboard", requireAuth, requireCreator, async (req, res, next) => {
   try {
-    await ensureCreator(req);
     const videos = await Video.find({ creatorId: req.user.id }).sort({ createdAt: -1 });
     const agg = await Video.aggregate([
       { $match: { creatorId: new mongoose.Types.ObjectId(req.user.id) } },

@@ -1,20 +1,22 @@
 const API = import.meta.env.VITE_API_URL || "";
 
-function getToken() {
-  return localStorage.getItem("token");
-}
-
 export async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...options.headers };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API}${path}`, { ...options, headers });
+  // LOW-1: No longer read token from localStorage — the httpOnly cookie is sent automatically
+  // by the browser when credentials: "include" is set.
+  // We only attach Authorization header if it's explicitly passed in options.headers.
+
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers,
+    credentials: "include", // LOW-1: Send httpOnly cookie with every request
+  });
+
   const data = await res.json().catch(() => ({}));
 
   // If the session is invalid/expired, clear local auth state and redirect to login
   if (res.status === 401) {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
     // Only redirect if not already on login page
     if (!window.location.pathname.startsWith("/login")) {
@@ -48,4 +50,3 @@ export function normalizeUrl(url) {
   }
   return url;
 }
-

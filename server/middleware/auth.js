@@ -3,15 +3,42 @@ import { DeviceSession } from "../models/DeviceSession.js";
 import { User } from "../models/User.js";
 import { AppError } from "./errorHandler.js";
 
+/**
+ * NEW-MED-1 FIX: Return the JWT secret, throwing in production if it's missing or insecure.
+ * "dev-secret" fallback is only acceptable in local development.
+ */
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === "production" && (!secret || secret === "dev-secret")) {
+    throw new Error("[SECURITY] JWT_SECRET must be set to a strong secret in production");
+  }
+  return secret || "dev-secret";
+}
+
+/**
+ * Extract the JWT from (in priority order):
+ *  1. Authorization: Bearer <token>  header
+ *  2. httpOnly cookie named "token"  (LOW-1: tokens stored in httpOnly cookie)
+ */
+function extractToken(req) {
+  const header = req.headers.authorization;
+  if (header?.startsWith("Bearer ")) {
+    return header.slice(7);
+  }
+  if (req.cookies?.token) {
+    return req.cookies.token;
+  }
+  return null;
+}
+
 export async function requireAuth(req, _res, next) {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
+    const token = extractToken(req);
+    if (!token) {
       throw new AppError("Unauthorized", 401);
     }
 
-    const token = header.slice(7);
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
+    const payload = jwt.verify(token, getJwtSecret());
 
     // Find the session WITHOUT populate — just get the raw userId ObjectId
     const session = await DeviceSession.findById(payload.sessionId);
@@ -53,8 +80,8 @@ export async function requireAuth(req, _res, next) {
 }
 
 export function optionalAuth(req, _res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return next();
+  const token = extractToken(req);
+  if (!token) return next();
   requireAuth(req, _res, next);
 }
 

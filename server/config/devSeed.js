@@ -127,26 +127,28 @@ export async function ensureDevSeed() {
 
   let creator = await User.findOne({ email: "demo@streamvault.local" });
   if (!creator) {
-    const passwordHash = await bcrypt.hash("demo12345", 10);
+    // LOW-4 FIX: Stronger seeded password (not admin12345 / demo12345)
+    const passwordHash = await bcrypt.hash("StreamVault#Demo2024!", 10);
     creator = await User.create({
       email: "demo@streamvault.local",
       passwordHash,
       displayName: "Demo Creator",
       role: "creator",
     });
-    console.log("Dev seed: demo user demo@streamvault.local / demo12345");
+    console.log("Dev seed: demo user demo@streamvault.local / StreamVault#Demo2024!");
   }
 
   let admin = await User.findOne({ email: "admin@streamvault.local" });
   if (!admin) {
-    const passwordHash = await bcrypt.hash("admin12345", 10);
+    // LOW-4 FIX: Stronger seeded password
+    const passwordHash = await bcrypt.hash("StreamVault#Admin2024!", 10);
     admin = await User.create({
       email: "admin@streamvault.local",
       passwordHash,
       displayName: "Demo Admin",
       role: "admin",
     });
-    console.log("Dev seed: admin user admin@streamvault.local / admin12345");
+    console.log("Dev seed: admin user admin@streamvault.local / StreamVault#Admin2024!");
   }
 
   // Ensure both demo creator and admin have active subscriptions
