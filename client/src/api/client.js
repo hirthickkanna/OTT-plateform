@@ -40,13 +40,22 @@ export function getDeviceId() {
 
 export function normalizeUrl(url) {
   if (!url) return url;
-  if (url.startsWith("/")) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+
+  let path = url;
   if (url.includes("/uploads/")) {
     const idx = url.indexOf("/uploads/");
-    return url.substring(idx);
+    path = url.substring(idx);
+  } else if (url.startsWith("uploads/")) {
+    path = "/" + url;
+  } else if (url.includes("/vod/")) {
+    const idx = url.indexOf("/vod/");
+    path = url.substring(idx);
+  } else if (url.startsWith("vod/")) {
+    path = "/" + url;
+  } else if (url.startsWith("/")) {
+    return url;
   }
-  if (url.startsWith("uploads/")) {
-    return "/" + url;
-  }
-  return url;
+
+  return `${API}${path}`;
 }

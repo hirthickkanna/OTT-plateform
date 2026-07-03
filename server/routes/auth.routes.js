@@ -42,13 +42,18 @@ function setAuthCookie(res, token) {
   res.cookie("token", token, {
     httpOnly: true,             // LOW-1: inaccessible to JavaScript
     secure: isProduction,       // HTTPS only in production
-    sameSite: "Strict",         // CSRF protection
+    sameSite: isProduction ? "none" : "Lax", // Allow cross-site cookies in prod (Render + Vercel)
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches JWT_EXPIRES_IN)
   });
 }
 
 function clearAuthCookie(res) {
-  res.clearCookie("token", { httpOnly: true, sameSite: "Strict" });
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "Lax",
+  });
 }
 
 function validate(req) {
